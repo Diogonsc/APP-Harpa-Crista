@@ -1,20 +1,44 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
 
-export default function App() {
+import React from 'react';
+import { View } from 'react-native';
+import "./global.css"
+import { TabBar } from './src/components/TabBar';
+import { NavigationContainer } from '@react-navigation/native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { ThemeProvider } from './src/contexts/ThemeContext';
+import { FavoritosProvider } from './src/contexts/FavoritosContext';
+import { AudioProvider } from './src/contexts/AudioContext';
+import { StatusBar } from './src/components/StatusBar';
+import FloatingPlayer from './src/components/FloatingPlayer';
+import MediaNotification from './src/components/MediaNotification';
+import { useBackgroundAudio } from './src/hooks/useBackgroundAudio';
+
+function AppContent() {
+  useBackgroundAudio();
+  
   return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <SafeAreaProvider>
+      <View style={{ flex: 1 }}>
+        <StatusBar />
+        <NavigationContainer>
+          <TabBar />
+        </NavigationContainer>
+        <FloatingPlayer />
+        <MediaNotification />
+      </View>
+    </SafeAreaProvider>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+export default function App() {
+  return (
+    <ThemeProvider>
+      <FavoritosProvider>
+        <AudioProvider>
+          <AppContent />
+        </AudioProvider>
+      </FavoritosProvider>
+    </ThemeProvider>
+  );
+}
+
