@@ -127,7 +127,13 @@ export function FavoritiesScreen({ navigation }: FavoritiesScreenProps) {
             placeholder="Buscar favoritos ou digite um número"
             placeholderTextColor={colors.textSecondary}
             value={searchText}
-            onChangeText={setSearchText}
+            onChangeText={(text) => {
+              setSearchText(text);
+              // Se o texto foi apagado completamente, mostrar todos os favoritos
+              if (!text.trim()) {
+                // A lista já é filtrada automaticamente, então não precisa de ação adicional
+              }
+            }}
             onSubmitEditing={buscarFavoritos}
             returnKeyType="search"
             keyboardType="default"
@@ -144,9 +150,7 @@ export function FavoritiesScreen({ navigation }: FavoritiesScreenProps) {
 
       <View style={styles.content}>
         <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 15 }]}>
-          {searchText.trim() 
-            ? `Resultados da Busca (${filteredFavorites.length} de ${favoritos.length})` 
-            : `Todos os Favoritos: ${favoritos.length}`
+          {`Todos os Favoritos: ${favoritos.length}`
           }
         </Text>
         {searching ? (

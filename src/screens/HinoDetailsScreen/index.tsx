@@ -23,6 +23,7 @@ import { buildApiUrl, API_CONFIG, validateAudioUrl, testAudioUrl, logError } fro
 import { getThemeClass } from '../../utils/colors';
 import { StatusBar } from '../../components/StatusBar';
 import { useSafeAudio } from '../../hooks/useSafeAudio';
+import { LocalStorageService } from '../../services/localStorageService';
 
 // Criar FlatList animado para resolver o erro do VirtualizedList
 const AnimatedFlatList = Animated.createAnimatedComponent(FlatList<ListItem>);
@@ -488,6 +489,18 @@ export function HinoDetailsScreen({ route, navigation }: HinoDetalheProps) {
   const carregarHinoDetalhe = async () => {
     try {
       setLoading(true);
+      
+      // Primeiro, tentar carregar dados locais
+      const hinoCompletoLocal = await LocalStorageService.getHinoCompletoByNumber(hino.numero);
+      
+      if (hinoCompletoLocal) {
+        console.log(`Carregando hino ${hino.numero} do cache local`);
+        setHinoCompleto(hinoCompletoLocal);
+        return;
+      }
+      
+      // Se não encontrou localmente, tentar via API
+      console.log(`Hino ${hino.numero} não encontrado localmente, buscando via API...`);
       const hinoCompletoSrv = await ApiService.getHinoPorNumero(hino.numero);
       
       if (hinoCompletoSrv) {

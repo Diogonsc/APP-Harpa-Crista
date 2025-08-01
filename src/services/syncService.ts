@@ -1,6 +1,6 @@
 import { ApiService } from './api';
 import { LocalStorageService } from './localStorageService';
-import { HinoLocal } from '../types/api';
+import { HinoLocal, HinoCompleto } from '../types/api';
 
 export interface SyncProgress {
   currentPage: number;
@@ -24,6 +24,7 @@ export class SyncService {
       console.log('Iniciando sincronização de hinos...');
       
       const allHinos: HinoLocal[] = [];
+      const allHinosCompletos: HinoCompleto[] = [];
       let pagina = 1;
       let hasMorePages = true;
       const limit = 100; // Buscar mais hinos por página para acelerar
@@ -36,6 +37,9 @@ export class SyncService {
         totalPages = firstResponse.paginacao.totalPaginas;
         totalHinos = firstResponse.paginacao.total;
         allHinos.push(...firstResponse.hinos);
+        
+        // Baixar dados completos dos hinos da primeira página
+        await this.downloadHinosCompletos(firstResponse.hinos, allHinosCompletos);
         
         // Notificar progresso inicial
         if (callbacks?.onProgress) {
@@ -61,6 +65,9 @@ export class SyncService {
         try {
           const response = await ApiService.getHinos(pagina, limit);
           allHinos.push(...response.hinos);
+          
+          // Baixar dados completos dos hinos desta página
+          await this.downloadHinosCompletos(response.hinos, allHinosCompletos);
           
           // Notificar progresso
           if (callbacks?.onProgress) {
@@ -91,6 +98,10 @@ export class SyncService {
       // Salvar todos os hinos no storage local
       console.log(`Salvando ${allHinos.length} hinos no storage local...`);
       await LocalStorageService.saveHinos(allHinos);
+      
+      // Salvar dados completos dos hinos no storage local
+      console.log(`Salvando ${allHinosCompletos.length} hinos completos no storage local...`);
+      await LocalStorageService.saveHinosCompletos(allHinosCompletos);
       
       console.log(`Sincronização concluída! ${allHinos.length} hinos salvos localmente.`);
       
@@ -129,6 +140,55 @@ export class SyncService {
       
       return result;
     }
+  }
+
+  /**
+   * Baixa dados completos de uma lista de hinos
+   */
+  private static async downloadHinosCompletos(hinos: HinoLocal[], allHinosCompletos: HinoCompleto[]): Promise<void> {
+    const promises = hinos.map(async (hino) => {
+      try {
+        // Buscar dados completos do hino via API
+        const response = await fetch(`https://api-harpa-crista-uzgo.vercel.app/api/hinos/${hino.numero}`);
+        const data = await response.json();
+        
+        if (data && data.number) {
+          let coro = '';
+          if (data.verses && Array.isArray(data.verses) && data.verses.length > 0) {
+            const coroVerso = data.verses.find((verso: any) => verso.chorus === true);
+            if (coroVerso) coro = coroVerso.lyrics;
+          }
+
+          let letraCompleta = '';
+          if (data.verses && Array.isArray(data.verses) && data.verses.length > 0) {
+            data.verses.forEach((verso: any, index: number) => {
+              if (verso.lyrics) {
+                if (!verso.chorus) letraCompleta += `${verso.sequence}. `;
+                letraCompleta += verso.lyrics;
+                if (index < data.verses.length - 1) letraCompleta += '\n\n';
+              }
+            });
+          }
+
+          const hinoCompleto: HinoCompleto = {
+            numero: data.number,
+            titulo: data.title,
+            autor: data.author,
+            letra: letraCompleta,
+            verses: data.verses,
+            coro,
+            audioUrl: data.audioUrl,
+          };
+
+          allHinosCompletos.push(hinoCompleto);
+        }
+      } catch (error) {
+        console.error(`Erro ao baixar dados completos do hino ${hino.numero}:`, error);
+        // Continuar com os próximos hinos mesmo se um falhar
+      }
+    });
+
+    await Promise.all(promises);
   }
 
   /**

@@ -22,6 +22,8 @@ import { HinoLocal, Estatisticas, Audio, HinosPaginados } from '../../types/api'
 import HinoItem from '../../components/HinoItem';
 import { StatusBar } from '../../components/StatusBar';
 import { SyncStatus } from '../../components/SyncStatus';
+import { InitialSyncModal } from '../../components/InitialSyncModal';
+import { LocalStorageService } from '../../services/localStorageService';
 
 type InicioProps = {
   navigation: any;
@@ -52,13 +54,45 @@ const InicioScreen = ({ navigation }: InicioProps) => {
     try {
       setLoading(true);
       
-      // Verificar se precisa sincronizar e fazer sincronização se necessário
-      const syncResult = await SyncService.syncIfNeeded();
+      // Verificar se há dados locais
+      const stats = await LocalStorageService.getCacheStats();
+      const hinosCompletos = await LocalStorageService.loadHinosCompletos();
       
-      if (syncResult.success) {
-        console.log(`Sincronização concluída com ${syncResult.totalHinos} hinos`);
+      if (stats.totalHinos === 0 || hinosCompletos.length === 0) {
+        console.log('Nenhum dado local encontrado, iniciando sincronização em segundo plano...');
+        
+        // Carregar hinos e estatísticas primeiro
+        await Promise.all([
+          carregarHinos(),
+          carregarEstatisticas()
+        ]);
+        
+        // Iniciar sincronização em segundo plano
+        SyncService.syncIfNeeded().then((syncResult) => {
+          if (syncResult.success) {
+            console.log(`Sincronização em segundo plano concluída com ${syncResult.totalHinos} hinos`);
+            // Recarregar hinos após sincronização
+            carregarHinos();
+          } else {
+            console.log('Sincronização em segundo plano falhou');
+          }
+        }).catch((error) => {
+          console.error('Erro na sincronização em segundo plano:', error);
+        });
+        
       } else {
-        console.log('Sincronização falhou, mas continuando com dados locais se disponíveis');
+        console.log(`Dados locais encontrados: ${stats.totalHinos} hinos básicos, ${hinosCompletos.length} hinos completos`);
+        
+        // Verificar se precisa sincronizar em segundo plano
+        SyncService.syncIfNeeded().then((syncResult) => {
+          if (syncResult.success) {
+            console.log(`Sincronização em segundo plano concluída com ${syncResult.totalHinos} hinos`);
+          } else {
+            console.log('Sincronização em segundo plano não necessária');
+          }
+        }).catch((error) => {
+          console.error('Erro na sincronização em segundo plano:', error);
+        });
       }
       
       // Carregar hinos e estatísticas
@@ -109,7 +143,9 @@ const InicioScreen = ({ navigation }: InicioProps) => {
         Alert.alert('Erro', 'Não foi possível carregar os hinos. Tente novamente.');
       }
     } finally {
-      setLoading(false);
+      if (resetar) {
+        setLoading(false);
+      }
       setCarregandoMais(false);
     }
   }, []);
@@ -132,20 +168,9 @@ const InicioScreen = ({ navigation }: InicioProps) => {
     setRefreshing(false);
   }, [carregarHinos, carregarEstatisticas]);
 
-  const handleManualSync = useCallback(async () => {
-    try {
-      const result = await SyncService.forceSync({
-        onComplete: async (result) => {
-          if (result.success) {
-            // Recarregar a lista após sincronização
-            await carregarHinos(1, true);
-          }
-        }
-      });
-    } catch (error) {
-      console.error('Erro ao iniciar sincronização:', error);
-    }
-  }, [carregarHinos]);
+
+
+  // Função removida - sincronização agora acontece em segundo plano
 
   const buscarHinoAleatorio = useCallback(async () => {
     try {
@@ -451,21 +476,29 @@ const InicioScreen = ({ navigation }: InicioProps) => {
 
       {renderEstatisticas()}
 
-      <SyncStatus onSyncPress={handleManualSync} />
+      <SyncStatus />
 
       <View style={[styles.searchContainer, { backgroundColor: colors.surface }]}>
         <View style={[styles.searchInputContainer, { backgroundColor: colors.searchBackground, borderWidth: 1, borderColor: colors.border }]}>
           <Feather name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
-          <TextInput
-            style={[styles.searchInput, { color: colors.text }]}
-            placeholder="Buscar hinos ou digite um número"
-            placeholderTextColor={colors.textSecondary}
-            value={searchText}
-            onChangeText={setSearchText}
-            onSubmitEditing={buscarHinos}
-            returnKeyType="search"
-            keyboardType="default"
-          />
+                     <TextInput
+             style={[styles.searchInput, { color: colors.text }]}
+             placeholder="Buscar hinos ou digite um número"
+             placeholderTextColor={colors.textSecondary}
+             value={searchText}
+             onChangeText={(text) => {
+               setSearchText(text);
+               // Se o texto foi apagado completamente, recarregar a lista
+               if (!text.trim()) {
+                 setPaginaAtual(1);
+                 setTemMaisPaginas(true);
+                 carregarHinos(1, true);
+               }
+             }}
+             onSubmitEditing={buscarHinos}
+             returnKeyType="search"
+             keyboardType="default"
+           />
           <TouchableOpacity
             style={styles.searchButton}
             onPress={buscarHinos}
@@ -478,9 +511,7 @@ const InicioScreen = ({ navigation }: InicioProps) => {
 
       <View style={styles.content}>
         <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 15 }]}>
-          {searchText.trim() 
-            ? `Resultados da Busca (${hinos.length} de ${totalHinos})` 
-            : `Todos os Hinos: ${totalHinos}`
+          {`Todos os Hinos: ${totalHinos}`
           }
         </Text>
         {searching ? (
@@ -514,6 +545,8 @@ const InicioScreen = ({ navigation }: InicioProps) => {
           />
         )}
       </View>
+      
+      {/* Modal de sincronização inicial removido - sincronização agora acontece em segundo plano */}
     </SafeAreaView>
   );
 };

@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { HinoLocal, HinosPaginados } from '../types/api';
+import { HinoLocal, HinosPaginados, HinoCompleto } from '../types/api';
 
 const HINOS_STORAGE_KEY = '@harpa_crista_hinos_cache';
+const HINOS_COMPLETOS_STORAGE_KEY = '@harpa_crista_hinos_completos_cache';
 const HINOS_LAST_UPDATE_KEY = '@harpa_crista_hinos_last_update';
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 horas
 
@@ -21,6 +22,19 @@ export class LocalStorageService {
   }
 
   /**
+   * Salva dados completos dos hinos (incluindo letra e versos) no storage local
+   */
+  static async saveHinosCompletos(hinosCompletos: HinoCompleto[]): Promise<void> {
+    try {
+      await AsyncStorage.setItem(HINOS_COMPLETOS_STORAGE_KEY, JSON.stringify(hinosCompletos));
+      console.log(`Salvos ${hinosCompletos.length} hinos completos no cache local`);
+    } catch (error) {
+      console.error('Erro ao salvar hinos completos no cache local:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Carrega todos os hinos do storage local
    */
   static async loadHinos(): Promise<HinoLocal[]> {
@@ -35,6 +49,37 @@ export class LocalStorageService {
     } catch (error) {
       console.error('Erro ao carregar hinos do cache local:', error);
       return [];
+    }
+  }
+
+  /**
+   * Carrega dados completos dos hinos do storage local
+   */
+  static async loadHinosCompletos(): Promise<HinoCompleto[]> {
+    try {
+      const hinosCompletosData = await AsyncStorage.getItem(HINOS_COMPLETOS_STORAGE_KEY);
+      if (hinosCompletosData) {
+        const hinosCompletos = JSON.parse(hinosCompletosData);
+        console.log(`Carregados ${hinosCompletos.length} hinos completos do cache local`);
+        return hinosCompletos;
+      }
+      return [];
+    } catch (error) {
+      console.error('Erro ao carregar hinos completos do cache local:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Busca um hino completo por número no cache local
+   */
+  static async getHinoCompletoByNumber(numero: number): Promise<HinoCompleto | null> {
+    try {
+      const hinosCompletos = await this.loadHinosCompletos();
+      return hinosCompletos.find(hino => hino.numero === numero) || null;
+    } catch (error) {
+      console.error('Erro ao buscar hino completo no cache local:', error);
+      return null;
     }
   }
 
@@ -144,6 +189,7 @@ export class LocalStorageService {
   static async clearCache(): Promise<void> {
     try {
       await AsyncStorage.removeItem(HINOS_STORAGE_KEY);
+      await AsyncStorage.removeItem(HINOS_COMPLETOS_STORAGE_KEY);
       await AsyncStorage.removeItem(HINOS_LAST_UPDATE_KEY);
       console.log('Cache local limpo');
     } catch (error) {

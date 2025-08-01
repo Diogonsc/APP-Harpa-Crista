@@ -366,7 +366,15 @@ export function AudioScreen({ navigation }: AudioScreenProps) {
             placeholder="Buscar áudios ou digite um número"
             placeholderTextColor={colors.textSecondary}
             value={searchText}
-            onChangeText={setSearchText}
+            onChangeText={(text) => {
+              setSearchText(text);
+              // Se o texto foi apagado completamente, recarregar a lista
+              if (!text.trim()) {
+                setPaginaAtual(1);
+                setTemMaisPaginas(true);
+                carregarAudios(1, true);
+              }
+            }}
             onSubmitEditing={buscarAudios}
             returnKeyType="search"
             keyboardType="default"
@@ -383,10 +391,7 @@ export function AudioScreen({ navigation }: AudioScreenProps) {
 
       <View style={styles.content}>
         <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 15 }]}>
-          {searchText.trim() 
-            ? `Resultados da Busca (${audios.length} de ${totalAudios})` 
-            : `Todos os Áudios: ${totalAudios}`
-          }
+          {`Todos os Áudios: ${totalAudios}`}
         </Text>
         {searching ? (
           <View style={styles.loadingContainer}>
